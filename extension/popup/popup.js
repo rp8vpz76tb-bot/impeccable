@@ -68,7 +68,7 @@ btnScan.addEventListener('click', async () => {
   if (!tabId) return;
   activeTabId = tabId;
   scanError.hidden = true;
-  btnScan.textContent = 'Scanning...';
+  btnScan.textContent = 'Scanning page...';
   btnScan.disabled = true;
   chrome.runtime.sendMessage({ action: 'scan', tabId });
 });

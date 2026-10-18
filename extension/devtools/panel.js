@@ -221,57 +221,99 @@ function showScanning() {
     </div>`;
 }
 
-// Maps each anti-pattern to the most relevant Impeccable skill(s) for fixing it.
-// These are suggestions; the user decides whether and how to apply them.
-const FIX_SKILLS = {
+// Maps each anti-pattern to the Impeccable commands that fix it, run as
+// `/impeccable <command>`. Suggestions only; the user decides what to apply.
+// Every rule id in the registry has an entry. A rule added without one falls
+// back to its category's default, so the brief never names a command that
+// does not exist.
+const FIX_COMMANDS = {
   // AI slop
-  'side-tab':                'distill, polish',
-  'border-accent-on-rounded':'distill, polish',
-  'overused-font':           'typeset',
-  'flat-type-hierarchy':     'typeset',
-  'gradient-text':           'typeset, distill',
-  'ai-color-palette':        'colorize, distill',
-  'nested-cards':            'distill, arrange',
-  'monotonous-spacing':      'arrange',
-  'everything-centered':     'arrange',
-  'bounce-easing':           'animate',
-  'dark-glow':               'quieter, distill',
-  'icon-tile-stacked-above-heading': 'distill, arrange',
+  'side-tab':                    ['distill', 'polish'],
+  'border-accent-on-rounded':    ['distill', 'polish'],
+  'overused-font':               ['typeset'],
+  'flat-type-hierarchy':         ['typeset'],
+  'gradient-text':               ['typeset', 'distill'],
+  'ai-color-palette':            ['colorize', 'distill'],
+  'cream-palette':               ['colorize'],
+  'nested-cards':                ['distill', 'layout'],
+  'monotonous-spacing':          ['layout'],
+  'bounce-easing':               ['animate'],
+  'pulsing-dot':                 ['quieter', 'distill'],
+  'blinking-cursor':             ['quieter'],
+  'shape-assembled-illustration':['distill'],
+  'dark-glow':                   ['quieter', 'distill'],
+  'radial-halo':                 ['quieter'],
+  'radial-spotlight-glow':       ['quieter'],
+  'marquee':                     ['distill', 'quieter'],
+  'icon-tile-stack':             ['distill', 'layout'],
+  'italic-serif-display':        ['typeset'],
+  'hero-eyebrow-chip':           ['distill'],
+  'kicker-above-heading':        ['distill'],
+  'numbered-section-labels':     ['distill'],
+  'em-dash-overuse':             ['clarify'],
+  'marketing-buzzword':          ['clarify'],
+  'aphoristic-cadence':          ['clarify'],
+  'oversized-h1':                ['typeset'],
+  'extreme-negative-tracking':   ['typeset'],
+  'gpt-thin-border-wide-shadow': ['quieter', 'polish'],
+  'repeating-stripes-gradient':  ['distill'],
+  'codex-grid-background':       ['distill'],
+  'theater-slop-phrase':         ['clarify'],
   // Quality
-  'pure-black-white':        'colorize',
-  'gray-on-color':           'colorize',
-  'low-contrast':            'colorize, audit',
-  'line-length':             'arrange, typeset',
-  'cramped-padding':         'arrange, polish',
-  'tight-leading':           'typeset',
-  'skipped-heading':         'audit, harden',
-  'justified-text':          'typeset',
-  'straggler':               'typeset',
-  'unbalanced-heading':      'typeset',
-  'tiny-text':               'typeset',
-  'all-caps-body':           'typeset',
-  'wide-tracking':           'typeset',
+  'organic-clip-path':           ['polish'],
+  'buried-raster':               ['polish'],
+  'broken-image':                ['harden'],
+  'script-error':                ['harden'],
+  'content-hidden-at-rest':      ['harden'],
+  'edge-flush-cards':            ['layout'],
+  'text-occlusion':              ['layout', 'adapt'],
+  'first-viewport-column-overflow': ['adapt', 'layout'],
+  'gray-on-color':               ['colorize'],
+  'low-contrast':                ['colorize', 'audit'],
+  'line-length':                 ['layout', 'typeset'],
+  'cramped-padding':             ['layout', 'polish'],
+  'body-text-viewport-edge':     ['layout', 'adapt'],
+  'tight-leading':               ['typeset'],
+  'skipped-heading':             ['audit', 'harden'],
+  'heading-rhythm':              ['typeset', 'layout'],
+  'justified-text':              ['typeset'],
+  'straggler':                   ['typeset'],
+  'unbalanced-heading':          ['typeset'],
+  'tiny-text':                   ['typeset'],
+  'undersized-ui-text':          ['typeset', 'adapt'],
+  'all-caps-body':               ['typeset'],
+  'wide-tracking':               ['typeset'],
+  'text-overflow':               ['harden', 'adapt'],
+  'repeated-container-text':     ['clarify', 'distill'],
+  'clipped-overflow-container':  ['harden', 'adapt'],
+  'design-system-font':          ['typeset'],
+  'design-system-color':         ['colorize'],
+  'design-system-radius':        ['polish'],
+  'design-system-font-size':     ['typeset'],
 };
+const FIX_FALLBACK = { slop: ['distill'], quality: ['polish'] };
 
-function fixSkillFor(type) {
-  const skills = FIX_SKILLS[type] || 'polish';
-  // Prefix each comma-separated skill with a slash for clarity
-  return skills.split(',').map(s => '/' + s.trim()).join(', ');
+function fixCommandsFor(finding) {
+  return FIX_COMMANDS[finding.type] || FIX_FALLBACK[finding.category] || FIX_FALLBACK.quality;
 }
 
-// Returns a sorted array of unique skills referenced by the given findings,
-// most-frequent first. Each entry already has the leading slash.
-function uniqueSkillsForFindings(findings) {
+// Commands for one finding, as the user would type them.
+function fixCommandLine(finding) {
+  return fixCommandsFor(finding).map(c => '/impeccable ' + c).join(', ');
+}
+
+// Returns the unique commands referenced by the given findings, most-frequent
+// first, each as a full `/impeccable <command>` string.
+function uniqueCommandsForFindings(findings) {
   const counts = new Map();
   for (const item of findings) {
     for (const f of item.findings) {
-      const list = (FIX_SKILLS[f.type] || 'polish').split(',').map(s => '/' + s.trim());
-      for (const s of list) {
-        counts.set(s, (counts.get(s) || 0) + 1);
+      for (const c of fixCommandsFor(f)) {
+        counts.set(c, (counts.get(c) || 0) + 1);
       }
     }
   }
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([s]) => s);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => '/impeccable ' + c);
 }
 
 function getInspectedUrl() {
@@ -317,15 +359,15 @@ async function formatFindingsForCopy(findings) {
     lines.push('');
   }
 
-  // Roll up suggested skills across all findings (most-relevant first)
-  const skills = uniqueSkillsForFindings(findings);
-  if (skills.length) {
-    lines.push(`Suggested Impeccable skills to fix: ${skills.join(', ')}`);
+  // Roll up suggested commands across all findings (most-frequent first)
+  const commands = uniqueCommandsForFindings(findings);
+  if (commands.length) {
+    lines.push(`Suggested Impeccable commands to fix: ${commands.join(', ')}`);
     lines.push('');
   }
 
   lines.push('---');
-  lines.push('Detected by [Impeccable](https://impeccable.style). Skills are suggestions, not required.');
+  lines.push('Detected by [Impeccable](https://impeccable.style). Commands are suggestions, not required.');
   return lines.join('\n');
 }
 
@@ -339,7 +381,7 @@ async function formatSingleFindingForCopy(item, finding) {
   lines.push('');
   lines.push(finding.description);
   lines.push('');
-  lines.push(`Suggested Impeccable skill(s) to fix: ${fixSkillFor(finding.type)}`);
+  lines.push(`Suggested Impeccable command(s) to fix: ${fixCommandLine(finding)}`);
   return lines.join('\n');
 }
 
