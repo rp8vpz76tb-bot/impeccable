@@ -170,7 +170,7 @@ body {
   background: var(--ks-kinpaku);
   color: var(--ks-on-gold);
   font-family: var(--ks-mono);
-  font-size: 9px;
+  font-size: var(--ks-type-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
   line-height: 1;
@@ -179,16 +179,30 @@ body {
   vertical-align: middle;
 }
 
+@media (forced-colors: active) {
+  .ks-tag { border: 1px solid CanvasText; }
+}
+
+/* Reduced motion: state changes still happen, they just land at once. Every
+   color fade and slide in the extension runs on these two durations. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ks-quick: 0ms;
+    --ks-settle: 0ms;
+  }
+}
+
 .ks-tag.is-quiet {
   background: var(--ks-gray);
   color: var(--ks-text-muted);
 }
 
 /* ============================================================
-   Focus. Patina, everywhere, at 2px.
+   Focus. Patina-deep, everywhere, at 2px. Plain patina measures 2.37:1 on
+   paper; patina-deep measures 6.41:1, which clears the 3:1 a focus ring owes.
    ============================================================ */
 :focus-visible {
-  outline: 2px solid var(--ks-patina);
+  outline: 2px solid var(--ks-patina-deep);
   outline-offset: 2px;
 }
 

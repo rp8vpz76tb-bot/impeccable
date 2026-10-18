@@ -137,7 +137,7 @@ export const SUITES = {
     commands: [
       {
         runner: 'node',
-        files: ['tests/extension-build.test.mjs', 'tests/extension-fix-commands.test.mjs'],
+        files: ['tests/extension-build.test.mjs', 'tests/extension-fix-commands.test.mjs', 'tests/extension-a11y.test.mjs'],
       },
     ],
   },

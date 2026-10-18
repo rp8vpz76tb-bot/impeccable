@@ -84,16 +84,21 @@ async function initSettings() {
   initAutoScanControl(stored.autoScan);
 }
 
+// A segmented control is a row of toggle buttons: the lit cap is also exposed
+// to assistive tech as the pressed one.
+function setSegmentActive(btn, active) {
+  btn.classList.toggle('active', active);
+  btn.setAttribute('aria-pressed', String(active));
+}
+
 function initAutoScanControl(currentMode) {
   const group = document.getElementById('auto-scan-mode');
   if (!group) return;
   for (const btn of group.querySelectorAll('button')) {
-    btn.classList.toggle('active', btn.dataset.value === currentMode);
+    setSegmentActive(btn, btn.dataset.value === currentMode);
     btn.addEventListener('click', async () => {
       const mode = btn.dataset.value;
-      for (const b of group.querySelectorAll('button')) {
-        b.classList.toggle('active', b === btn);
-      }
+      for (const b of group.querySelectorAll('button')) setSegmentActive(b, b === btn);
       await chrome.storage.sync.set({ autoScan: mode });
     });
   }
@@ -103,12 +108,10 @@ function initLineLengthControl(currentMode) {
   const group = document.getElementById('line-length-mode');
   if (!group) return;
   for (const btn of group.querySelectorAll('button')) {
-    btn.classList.toggle('active', btn.dataset.value === currentMode);
+    setSegmentActive(btn, btn.dataset.value === currentMode);
     btn.addEventListener('click', async () => {
       const mode = btn.dataset.value;
-      for (const b of group.querySelectorAll('button')) {
-        b.classList.toggle('active', b === btn);
-      }
+      for (const b of group.querySelectorAll('button')) setSegmentActive(b, b === btn);
       await chrome.storage.sync.set({ lineLengthMode: mode });
       chrome.runtime.sendMessage({ action: 'disabled-rules-changed' });
     });
@@ -125,16 +128,48 @@ function initSpotlightBlurToggle(currentValue) {
   });
 }
 
+const ruleSearch = document.getElementById('rule-search');
+const rulesSummary = document.getElementById('rules-summary');
+const rulesReset = document.getElementById('rules-reset');
+let ruleQuery = '';
+
+function renderRulesSummary() {
+  const total = allAntipatterns.length;
+  if (!total) {
+    rulesSummary.textContent = '';
+    rulesReset.hidden = true;
+    return;
+  }
+  const muted = disabledRules.length;
+  rulesSummary.textContent = muted
+    ? `${total - muted} of ${total} rules on, ${muted} muted`
+    : `All ${total} rules on`;
+  rulesReset.hidden = muted === 0;
+}
+
 function renderSettings() {
   settingsList.innerHTML = '';
+  renderRulesSummary();
 
   const categories = {
     slop: { label: 'AI tells', items: [] },
     quality: { label: 'Quality', items: [] },
   };
+  const query = ruleQuery.trim().toLowerCase();
+  let shown = 0;
   for (const ap of allAntipatterns) {
+    if (query && !`${ap.name} ${ap.id} ${ap.description || ''}`.toLowerCase().includes(query)) continue;
     const cat = ap.category || 'quality';
     (categories[cat] || categories.quality).items.push(ap);
+    shown++;
+  }
+
+  if (query && !shown) {
+    const none = document.createElement('p');
+    none.className = 'rules-none';
+    none.textContent = `No rule matches \u201c${ruleQuery.trim()}\u201d.`;
+    settingsList.appendChild(none);
+    return;
   }
 
   for (const [, group] of Object.entries(categories)) {
@@ -142,7 +177,7 @@ function renderSettings() {
 
     const header = document.createElement('div');
     header.className = 'settings-header';
-    header.textContent = group.label;
+    header.textContent = `${group.label} (${group.items.length})`;
     settingsList.appendChild(header);
 
     const grid = document.createElement('div');
@@ -151,11 +186,15 @@ function renderSettings() {
     for (const ap of group.items) {
       const label = document.createElement('label');
       label.className = 'setting-rule';
+      if (ap.description) label.title = ap.description;
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.checked = !disabledRules.includes(ap.id);
-      checkbox.addEventListener('change', () => toggleRule(ap.id, checkbox.checked));
+      checkbox.addEventListener('change', () => {
+        toggleRule(ap.id, checkbox.checked);
+        if (!checkbox.checked) offerUndo(ap);
+      });
 
       const text = document.createElement('span');
       text.textContent = ap.name;
@@ -174,9 +213,64 @@ async function toggleRule(ruleId, enabled) {
   } else {
     if (!disabledRules.includes(ruleId)) disabledRules.push(ruleId);
   }
+  renderRulesSummary();
   await chrome.storage.sync.set({ disabledRules });
   chrome.runtime.sendMessage({ action: 'disabled-rules-changed' });
 }
+
+// Muting a rule is cheap to do and cheap to take back: every mute says so, with
+// an Undo that stays up long enough to reach for.
+const toast = document.getElementById('toast');
+const toastText = document.getElementById('toast-text');
+const toastUndo = document.getElementById('toast-undo');
+let toastTimer = null;
+let toastAction = null;
+
+function showToast(message, onUndo) {
+  clearTimeout(toastTimer);
+  toastText.textContent = message;
+  toastAction = onUndo;
+  toast.hidden = false;
+  toastTimer = setTimeout(hideToast, 8000);
+}
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  toastAction = null;
+  toast.hidden = true;
+}
+
+toastUndo.addEventListener('click', () => {
+  const action = toastAction;
+  hideToast();
+  if (action) action();
+});
+
+function offerUndo(rule) {
+  showToast(`Muted \u201c${rule.name}\u201d.`, () => {
+    toggleRule(rule.id, true);
+    renderSettings();
+  });
+}
+
+function muteRule(ruleId, name) {
+  toggleRule(ruleId, false);
+  renderSettings();
+  offerUndo({ id: ruleId, name });
+}
+
+ruleSearch.addEventListener('input', () => {
+  ruleQuery = ruleSearch.value;
+  renderSettings();
+});
+
+rulesReset.addEventListener('click', async () => {
+  disabledRules = [];
+  hideToast();
+  renderSettings();
+  await chrome.storage.sync.set({ disabledRules });
+  chrome.runtime.sendMessage({ action: 'disabled-rules-changed' });
+});
 
 // Listen for messages from the service worker (called by getPort() on each new connection)
 function handlePortMessage(msg) {
@@ -253,10 +347,12 @@ btnSettings.addEventListener('click', () => {
   const isVisible = settingsContainer.style.display !== 'none';
   settingsContainer.style.display = isVisible ? 'none' : '';
   btnSettings.classList.toggle('active', !isVisible);
+  btnSettings.setAttribute('aria-expanded', String(!isVisible));
 });
 
 function updateToggleButton() {
   btnToggle.title = overlaysVisible ? 'Hide overlays' : 'Show overlays';
+  btnToggle.setAttribute('aria-pressed', String(overlaysVisible));
   btnToggle.classList.toggle('inactive', !overlaysVisible);
 }
 
@@ -475,6 +571,16 @@ container.addEventListener('pointermove', (e) => {
 
 // Slow-cursor fallbacks (these fire reliably for slow movements)
 container.addEventListener('pointerleave', () => setHoveredItem(null));
+
+// Keyboard focus highlights the page element the way the pointer does, so a
+// keyboard user sees what they are about to inspect.
+container.addEventListener('focusin', (e) => {
+  const item = e.target.closest('.finding-item');
+  setHoveredItem(item && item.dataset.selector ? item.dataset.selector : null);
+});
+container.addEventListener('focusout', (e) => {
+  if (!e.relatedTarget || !container.contains(e.relatedTarget)) setHoveredItem(null);
+});
 window.addEventListener('blur', () => setHoveredItem(null));
 
 
@@ -496,6 +602,8 @@ function renderEmptyState() {
     : `Nothing found at ${time}.`;
   btnScanNow.hidden = true;
 }
+
+let findingSeq = 0;
 
 function renderFindings(findings) {
   currentFindings = findings;
@@ -557,57 +665,74 @@ function renderFindings(findings) {
       <span class="category-count">${catCount}</span>`;
     section.appendChild(catHeader);
 
-    for (const [type, group] of groups) {
-    const groupEl = document.createElement('div');
-    groupEl.className = 'finding-group';
+    // Busiest rule first: the worst offender is the first thing in the section.
+    const ordered = [...groups].sort((x, y) => y[1].items.length - x[1].items.length);
+    for (const [type, group] of ordered) {
+      const groupEl = document.createElement('div');
+      groupEl.className = 'finding-group';
 
-    const header = document.createElement('div');
-    header.className = 'group-header';
-    header.innerHTML = `
-      <span class="group-chevron">&#9660;</span>
-      <span class="group-name">${escapeHtml(group.name)}</span>
-      <span class="group-count">${group.items.length}</span>`;
-    header.addEventListener('click', () => header.classList.toggle('collapsed'));
-    groupEl.appendChild(header);
-
-    const itemsEl = document.createElement('div');
-    itemsEl.className = 'group-items';
-
-    for (const item of group.items) {
-      const itemEl = document.createElement('div');
-      itemEl.className = 'finding-item' + (item.isHidden ? ' is-hidden' : '');
-      const tag = item.isPageLevel
-        ? '<span class="finding-tag tag-page">page</span>'
-        : item.isHidden ? '<span class="finding-tag tag-hidden" title="Element is currently hidden on the page">hidden</span>' : '';
-      itemEl.innerHTML = `
-        ${tag}
-        <div class="finding-row">
-          <span class="finding-selector">${escapeHtml(item.selector)}</span>
-          <button class="finding-copy" title="Copy this finding">
-            <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M11 1H3a2 2 0 0 0-2 2v10h2V3h8V1zm3 3H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 11H7V6h7v9z" fill="currentColor"/></svg>
-          </button>
-        </div>
-        <span class="finding-detail">${escapeHtml(item.detail)}</span>
-        <span class="finding-description">${escapeHtml(group.description)}</span>`;
-
-      const copyBtn = itemEl.querySelector('.finding-copy');
-      const finding = { type, name: group.name, description: group.description, detail: item.detail };
-      copyBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        copyToClipboard(formatSingleFindingForCopy(item, finding), copyBtn);
+      const header = document.createElement('div');
+      header.className = 'group-header';
+      header.innerHTML = `
+        <button type="button" class="group-toggle" aria-expanded="true">
+          <span class="group-chevron" aria-hidden="true">&#9660;</span>
+          <span class="group-name">${escapeHtml(group.name)}</span>
+          <span class="group-count" aria-label="${group.items.length} ${group.items.length === 1 ? 'finding' : 'findings'}">${group.items.length}</span>
+        </button>
+        <button type="button" class="group-mute" title="Stop checking for this rule" aria-label="Mute rule: ${escapeHtml(group.name)}">Mute</button>`;
+      const toggle = header.querySelector('.group-toggle');
+      toggle.addEventListener('click', () => {
+        const collapsed = header.classList.toggle('collapsed');
+        toggle.setAttribute('aria-expanded', String(!collapsed));
       });
+      header.querySelector('.group-mute').addEventListener('click', () => muteRule(type, group.name));
+      groupEl.appendChild(header);
 
-      if (!item.isPageLevel && !item.isHidden) {
-        itemEl.dataset.selector = item.selector;
-        itemEl.addEventListener('click', () => inspectElement(item.selector));
+      const itemsEl = document.createElement('div');
+      itemsEl.className = 'group-items';
+
+      for (const item of group.items) {
+        const inspectable = !item.isPageLevel && !item.isHidden;
+        const descId = `finding-desc-${++findingSeq}`;
+        const itemEl = document.createElement('div');
+        itemEl.className = 'finding-item' + (item.isHidden ? ' is-hidden' : '');
+        itemEl.setAttribute('role', 'group');
+        itemEl.setAttribute('aria-label', `${group.name}${item.isPageLevel ? ', page-level' : ', ' + item.selector}`);
+        const tag = item.isPageLevel
+          ? '<span class="finding-tag tag-page">page</span>'
+          : item.isHidden ? '<span class="finding-tag tag-hidden" title="Element is currently hidden on the page">hidden</span>' : '';
+        const selector = inspectable
+          ? `<button type="button" class="finding-selector finding-inspect" title="${escapeHtml(item.selector)}" aria-describedby="${descId}">${escapeHtml(item.selector)}</button>`
+          : `<span class="finding-selector" title="${escapeHtml(item.selector)}">${escapeHtml(item.selector)}</span>`;
+        itemEl.innerHTML = `
+          ${tag}
+          <div class="finding-row">
+            ${selector}
+            <button type="button" class="finding-copy" title="Copy this finding" aria-label="Copy finding: ${escapeHtml(group.name)}${item.isPageLevel ? ' (page-level)' : ' at ' + escapeHtml(item.selector)}" aria-describedby="${descId}">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M11 1H3a2 2 0 0 0-2 2v10h2V3h8V1zm3 3H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 11H7V6h7v9z" fill="currentColor"/></svg>
+            </button>
+          </div>
+          <span class="finding-detail">${escapeHtml(item.detail)}</span>
+          <span class="finding-description" id="${descId}">${escapeHtml(group.description)}</span>`;
+
+        const copyBtn = itemEl.querySelector('.finding-copy');
+        const finding = { type, name: group.name, description: group.description, detail: item.detail };
+        copyBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          copyToClipboard(formatSingleFindingForCopy(item, finding), copyBtn);
+        });
+
+        if (inspectable) {
+          itemEl.dataset.selector = item.selector;
+          itemEl.addEventListener('click', () => inspectElement(item.selector));
+        }
+
+        itemsEl.appendChild(itemEl);
       }
 
-      itemsEl.appendChild(itemEl);
+      groupEl.appendChild(itemsEl);
+      section.appendChild(groupEl);
     }
-
-    groupEl.appendChild(itemsEl);
-    section.appendChild(groupEl);
-  }
 
     container.appendChild(section);
   }

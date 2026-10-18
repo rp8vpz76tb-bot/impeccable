@@ -507,6 +507,19 @@ The global bottom bar and the contextual bar (configure / cycling / accept) shar
 
 **The Picker Is Brand Rule.** Live mode UI is Impeccable product chrome, not host-page chrome. It always ships the lacquer-deep fill, the carved-tile mark, and gold on the mark + active control. Brand reads through the mark and the gold accent rather than a gold border ringing the bar; the container itself stays a quiet neutral-edged tool.
 
+### Browser Extension
+
+The popup, the DevTools panel and the Elements sidebar are one surface, built on `extension/shared/kinpaku.css`. That file is the extension's token sheet and it is deliberately not a copy of the site's: it carries the light theme only, because the extension lives inside the browser's own chrome.
+
+- **One light theme, in both DevTools themes.** The panel is paper laid on the tool, not a lacquer panel. In dark DevTools it keeps the paper surface and gains a 2px ink seam and a harder rule so the sheet reads against the dark frame. Do not invert it.
+- **Neutral paper, not warm paper.** Ground is `oklch(97.8% 0 0)`, raised `oklch(99.5% 0 0)`, with chroma 0 throughout. The site's light mode uses a warm paper ground; the extension does not, so findings and page overlays read against a ground that tints nothing.
+- **Severity language.** Gold marks an AI tell, as a tag or dot, and never carries text on paper (it measures under 2:1). Patina marks quality issues, and `patina-deep` (`oklch(46% 0.08 188)`, 6.41:1) carries any patina text. Vermilion appears only when a scan did not run.
+- **Type.** Extension pages cannot load web fonts, so system stacks stand in for the two site faces: Avenir Next for Albert Sans, Avenir Next Condensed for the Alumni Sans wordmark, and the system monospace for selectors, counts and tags. The ramp is three steps: micro 11px (the floor for anything functional), label 12px, ui 13px. The popup count is 44px and the empty-state slash is 17px; both are display uses, not steps.
+- **Focus.** A 2px `patina-deep` outline with a 2px offset, everywhere. Plain patina measured 2.37:1 on paper and fails the 3:1 a focus ring owes.
+- **Text colors.** Ink and muted carry anything read. Faint (4.37:1) and mute-deep (2.92:1) are for glyphs and placeholders only.
+- **Controls.** Real buttons throughout. Segmented controls expose their lit cap with `aria-pressed`, and the overlay toggle keeps a fixed name with `aria-pressed`. Descriptions and copy reveal on hover or focus, never on hover alone. Muting a rule always offers Undo.
+- **Motion.** Every fade runs on `--ks-quick` and `--ks-settle`. Under `prefers-reduced-motion` both become 0ms, so state changes still land, they just do not animate. Under `forced-colors` the custom controls keep a system-color border or outline.
+
 ## 7. Do and Do Not
 
 ### Do

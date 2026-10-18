@@ -53,7 +53,7 @@ body {
 /* The slop marker: gold, and the only gold glyph in the pane. */
 .finding-name .marker {
   color: var(--ks-kinpaku-rich);
-  font-size: 10px;
+  font-size: var(--ks-type-micro);
   line-height: 1;
 }
 
@@ -68,7 +68,7 @@ body {
   background: var(--ks-gray);
   color: var(--ks-text-muted);
   font-family: var(--ks-mono);
-  font-size: 9px;
+  font-size: var(--ks-type-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
   line-height: 1;
@@ -91,4 +91,8 @@ body {
   font-size: var(--ks-type-micro);
   line-height: 1.5;
   color: var(--ks-text-muted);
+}
+
+@media (forced-colors: active) {
+  .finding-kind { border: 1px solid CanvasText; }
 }

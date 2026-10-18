@@ -18,16 +18,16 @@
       <span class="badge" id="badge">0</span>
     </div>
     <div class="toolbar-right">
-      <button class="tool-btn" id="btn-copy-all" title="Copy all findings">
+      <button class="tool-btn" id="btn-copy-all" type="button" title="Copy all findings" aria-label="Copy all findings">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11 1H3a2 2 0 0 0-2 2v10h2V3h8V1zm3 3H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 11H7V6h7v9z" fill="currentColor"/></svg>
       </button>
-      <button class="tool-btn" id="btn-rescan" title="Re-scan page">
+      <button class="tool-btn" id="btn-rescan" type="button" title="Re-scan page" aria-label="Re-scan page">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13.65 2.35A8 8 0 1 0 16 8h-2a6 6 0 1 1-1.76-4.24L10 6h6V0l-2.35 2.35z" fill="currentColor"/></svg>
       </button>
-      <button class="tool-btn" id="btn-toggle" title="Toggle overlays">
+      <button class="tool-btn" id="btn-toggle" type="button" title="Hide overlays" aria-label="Overlays" aria-pressed="true">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3C4.36 3 1.26 5.28 0 8.5c1.26 3.22 4.36 5.5 8 5.5s6.74-2.28 8-5.5C14.74 5.28 11.64 3 8 3zm0 9.17c-2.58 0-4.67-2.09-4.67-4.67S5.42 2.83 8 2.83s4.67 2.09 4.67 4.67S10.58 12.17 8 12.17zM8 5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="currentColor"/></svg>
       </button>
-      <button class="tool-btn" id="btn-settings" title="Settings">
+      <button class="tool-btn" id="btn-settings" type="button" title="Settings" aria-label="Settings" aria-expanded="false" aria-controls="settings-container">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13.6 8.8c.04-.26.06-.53.06-.8s-.02-.54-.06-.8l1.74-1.36a.42.42 0 0 0 .1-.52l-1.64-2.84a.41.41 0 0 0-.5-.18l-2.06.82a5.96 5.96 0 0 0-1.38-.8L9.5.2A.4.4 0 0 0 9.1 0H5.82a.4.4 0 0 0-.4.34l-.3 2.12c-.5.2-.96.48-1.38.8l-2.06-.82a.4.4 0 0 0-.5.18L-.46 5.46a.41.41 0 0 0 .1.52L1.38 7.34c-.04.26-.06.53-.06.8s.02.54.06.8L-.36 10.3a.42.42 0 0 0-.1.52l1.64 2.84c.1.18.32.24.5.18l2.06-.82c.42.32.88.6 1.38.8l.3 2.12a.4.4 0 0 0 .4.34h3.28a.4.4 0 0 0 .4-.34l.3-2.12c.5-.2.96-.48 1.38-.8l2.06.82c.18.08.4 0 .5-.18l1.64-2.84a.41.41 0 0 0-.1-.52L13.6 8.8zM7.46 10.8c-1.56 0-2.82-1.26-2.82-2.8s1.26-2.8 2.82-2.8 2.82 1.26 2.82 2.8-1.26 2.8-2.82 2.8z" fill="currentColor"/></svg>
       </button>
     </div>
@@ -36,25 +36,30 @@
   <div id="settings-container" style="display: none">
     <div class="settings-header">Preferences</div>
     <div class="setting-row">
-      <span class="setting-label">Auto-scan</span>
-      <div class="setting-segmented" id="auto-scan-mode">
-        <button data-value="panel">When panel opens</button>
-        <button data-value="devtools">When DevTools opens</button>
+      <span class="setting-label" id="auto-scan-label">Auto-scan</span>
+      <div class="setting-segmented" id="auto-scan-mode" role="group" aria-labelledby="auto-scan-label">
+        <button type="button" data-value="panel">When panel opens</button>
+        <button type="button" data-value="devtools">When DevTools opens</button>
       </div>
     </div>
     <div class="setting-row">
-      <span class="setting-label">Line length</span>
-      <div class="setting-segmented" id="line-length-mode">
-        <button data-value="strict">Strict (80)</button>
-        <button data-value="lax">Lax (120)</button>
+      <span class="setting-label" id="line-length-label">Line length</span>
+      <div class="setting-segmented" id="line-length-mode" role="group" aria-labelledby="line-length-label">
+        <button type="button" data-value="strict">Strict (80 characters)</button>
+        <button type="button" data-value="lax">Lax (120 characters)</button>
       </div>
     </div>
     <div class="setting-row">
-      <span class="setting-label">Highlight blur</span>
+      <span class="setting-label" id="spotlight-label">Blur the page around a highlight</span>
       <label class="setting-switch">
-        <input type="checkbox" id="spotlight-blur-toggle">
+        <input type="checkbox" id="spotlight-blur-toggle" aria-labelledby="spotlight-label">
         <span class="setting-switch-track"></span>
       </label>
+    </div>
+    <div class="rules-tools">
+      <input type="search" id="rule-search" class="rule-search" placeholder="Filter rules" aria-label="Filter rules">
+      <span class="rules-summary" id="rules-summary" role="status"></span>
+      <button type="button" class="rules-reset" id="rules-reset" hidden>Turn all back on</button>
     </div>
     <div id="settings-list"></div>
   </div>
@@ -72,6 +77,11 @@
       <button type="button" class="state-action" id="btn-scan-now">Scan page</button>
     </div>
   </main>
+
+  <div class="toast" id="toast" role="status" hidden>
+    <span id="toast-text"></span>
+    <button type="button" id="toast-undo">Undo</button>
+  </div>
 
   <script src="panel.js"></script>
 </body>

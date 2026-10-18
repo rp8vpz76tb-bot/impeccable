@@ -180,3 +180,11 @@ footer a:hover {
   color: var(--ks-ink);
   border-bottom-color: var(--ks-kinpaku);
 }
+
+/* Forced colors: transparent borders and backgrounds are dropped, so the
+   buttons and the numeral's rule take system colors. */
+@media (forced-colors: active) {
+  .btn { border-color: ButtonText; }
+  .count-number { border-bottom-color: CanvasText; }
+  .scan-error { border-left-color: CanvasText; }
+}

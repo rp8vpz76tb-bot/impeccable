@@ -74,7 +74,7 @@ h1 {
   background: var(--ks-kinpaku);
   color: var(--ks-on-gold);
   font-family: var(--ks-mono);
-  font-size: 10px;
+  font-size: var(--ks-type-micro);
   font-weight: 600;
   letter-spacing: 0.04em;
   line-height: 1;
@@ -203,7 +203,7 @@ h1 {
   background: var(--ks-gray);
   color: var(--ks-text-muted);
   font-family: var(--ks-mono);
-  font-size: 10px;
+  font-size: var(--ks-type-micro);
   font-weight: 600;
   line-height: 1;
 }
@@ -221,21 +221,66 @@ h1 {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 6px;
+  padding: 0 6px 0 0;
   border-radius: var(--ks-radius-sm);
-  cursor: pointer;
   user-select: none;
   transition: background-color var(--ks-quick) var(--ks-ease);
 }
 
-.group-header:hover {
+.group-header:hover,
+.group-header:focus-within {
   background: var(--ks-paper-deep);
+}
+
+/* The row's main action is a real button: it expands and collapses the group. */
+.group-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 24px;
+  padding: 5px 0 5px 6px;
+  border: 0;
+  border-radius: var(--ks-radius-sm);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Muting is the escape hatch for a noisy rule: shown on hover or focus, always
+   reachable by keyboard. */
+.group-mute {
+  flex: none;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--ks-radius-sm);
+  background: transparent;
+  color: var(--ks-text-muted);
+  font: inherit;
+  font-size: var(--ks-type-micro);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--ks-quick) var(--ks-ease), background-color var(--ks-quick) var(--ks-ease);
+}
+
+.group-header:hover .group-mute,
+.group-header:focus-within .group-mute {
+  opacity: 1;
+}
+
+.group-mute:hover {
+  background: var(--ks-paper-raised);
+  border-color: var(--ks-rule);
+  color: var(--ks-ink);
 }
 
 .group-chevron {
   width: 12px;
   flex-shrink: 0;
-  font-size: 9px;
+  font-size: var(--ks-type-micro);
   color: var(--ks-text-faint);
   transition: transform var(--ks-quick) var(--ks-ease);
 }
@@ -254,8 +299,8 @@ h1 {
 
 .group-count {
   font-family: var(--ks-mono);
-  font-size: 10px;
-  color: var(--ks-text-faint);
+  font-size: var(--ks-type-micro);
+  color: var(--ks-text-muted);
 }
 
 .group-items {
@@ -293,6 +338,15 @@ h1 {
 }
 
 /* The one colored text in the list. Patina clears 4.5:1 on paper. */
+/* The selector is the inspect action: a button that reads as the text it is. */
+button.finding-selector {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
 .finding-selector {
   font-family: var(--ks-mono);
   font-size: var(--ks-type-micro);
@@ -318,27 +372,32 @@ h1 {
   color: var(--ks-text-muted);
 }
 
-.finding-item:hover .finding-description {
+.finding-item:hover .finding-description,
+.finding-item:focus-within .finding-description {
   display: block;
 }
 
 .finding-copy {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   border: 1px solid transparent;
   border-radius: var(--ks-radius-sm);
   background: transparent;
-  color: var(--ks-text-faint);
+  color: var(--ks-text-muted);
   cursor: pointer;
-  transition: background-color var(--ks-quick) var(--ks-ease), color var(--ks-quick) var(--ks-ease);
+  opacity: 0;
+  transition: opacity var(--ks-quick) var(--ks-ease), background-color var(--ks-quick) var(--ks-ease), color var(--ks-quick) var(--ks-ease);
 }
 
-.finding-item:hover .finding-copy {
-  display: flex;
+/* Hover or focus reveals it; opacity, not display, so it stays in the tab order. */
+.finding-item:hover .finding-copy,
+.finding-item:focus-within .finding-copy,
+.finding-copy.copied {
+  opacity: 1;
 }
 
 .finding-copy:hover {
@@ -362,7 +421,7 @@ h1 {
   padding: 0 5px;
   border-radius: var(--ks-radius-sm);
   font-family: var(--ks-mono);
-  font-size: 9px;
+  font-size: var(--ks-type-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
   line-height: 1;
@@ -481,6 +540,103 @@ h1 {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   color: var(--ks-text-muted);
+}
+
+/* Rule tools: filter, how many are on, and the way back from muting. */
+.rules-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 6px 2px;
+}
+
+.rule-search {
+  flex: 1 1 140px;
+  min-width: 0;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid var(--ks-edge);
+  border-radius: var(--ks-radius-sm);
+  background: var(--ks-paper-raised);
+  box-shadow: var(--ks-track-recess);
+  color: var(--ks-ink);
+  font: inherit;
+  font-size: var(--ks-type-label);
+}
+
+.rule-search::placeholder {
+  color: var(--ks-text-muted);
+}
+
+.rules-summary {
+  font-size: var(--ks-type-micro);
+  color: var(--ks-text-muted);
+}
+
+.rules-reset {
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--ks-edge);
+  border-radius: var(--ks-radius-sm);
+  background: var(--ks-paper-raised);
+  box-shadow: var(--ks-cap-lift);
+  color: var(--ks-ink);
+  font: inherit;
+  font-size: var(--ks-type-micro);
+  cursor: pointer;
+}
+
+.rules-reset[hidden] {
+  display: none;
+}
+
+.rules-none {
+  padding: 10px 6px;
+  font-size: var(--ks-type-label);
+  color: var(--ks-text-muted);
+}
+
+/* Undo for a muted rule. Ink on paper, the one dark object in the pane. */
+.toast {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--ks-radius-sm);
+  background: var(--ks-ink);
+  box-shadow: 0 4px 14px oklch(13% 0 0 / 0.28);
+  font-size: var(--ks-type-label);
+  color: var(--ks-paper);
+}
+
+.toast[hidden] {
+  display: none;
+}
+
+.toast button {
+  flex: none;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--ks-kinpaku);
+  border-radius: var(--ks-radius-sm);
+  background: transparent;
+  color: var(--ks-kinpaku);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toast button:focus-visible {
+  outline-color: var(--ks-kinpaku);
 }
 
 #settings-list .settings-header {
@@ -635,7 +791,7 @@ h1 {
 }
 
 .setting-switch input:focus-visible + .setting-switch-track {
-  outline: 2px solid var(--ks-patina);
+  outline: 2px solid var(--ks-patina-deep);
   outline-offset: 2px;
 }
 
@@ -686,6 +842,41 @@ h1 {
   50% { opacity: 1; }
 }
 
+/* ============================================================
+   Reduced motion and forced colors
+   ============================================================ */
 @media (prefers-reduced-motion: reduce) {
   .scanning-dot { animation: none; }
+
+  /* The switch knob and its lamp snap to the new state instead of sliding. */
+  .setting-switch-track::before,
+  .setting-switch-track::after { transition: none; }
+}
+
+/* Windows High Contrast and other forced palettes drop backgrounds and
+   shadows, which is all the custom controls are drawn with. Give each state
+   a border or outline the system colors will keep. */
+@media (forced-colors: active) {
+  .tool-btn,
+  .group-mute,
+  .finding-copy,
+  .setting-segmented button { border: 1px solid ButtonText; }
+
+  .tool-btn.active,
+  .setting-segmented button.active { outline: 2px solid Highlight; outline-offset: -2px; }
+
+  .setting-switch-track { border: 1px solid ButtonText; box-shadow: none; }
+  .setting-switch-track::before { background: ButtonText; box-shadow: none; }
+  .setting-switch input:checked + .setting-switch-track { background: Highlight; }
+  .setting-switch input:checked + .setting-switch-track::before { background: HighlightText; }
+
+  .scanning-dot,
+  .setting-segmented button.active::before { background: Highlight; box-shadow: none; }
+
+  .category-count,
+  .finding-kind,
+  .finding-tag { border: 1px solid CanvasText; }
+
+  .toast { border: 1px solid CanvasText; }
+  .toast button { border-color: ButtonText; color: ButtonText; }
 }
