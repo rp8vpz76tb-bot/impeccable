@@ -47,6 +47,22 @@ let overlaysVisible = true;
 let allAntipatterns = [];
 let disabledRules = [];
 let currentFindings = [];
+// Scan lifecycle, as the service worker reports it. scannedAt stays null until
+// a scan has finished, so "not scanned" and "scanned, clean" never look alike.
+let scannedAt = null;
+let scanning = false;
+
+const scanErrorBox = document.getElementById('scan-error');
+const scanErrorText = document.getElementById('scan-error-text');
+const emptyTitle = document.getElementById('empty-title');
+const emptyHint = document.getElementById('empty-hint');
+const btnScanNow = document.getElementById('btn-scan-now');
+const btnRetry = document.getElementById('btn-retry');
+
+function showScanError(message) {
+  scanErrorText.textContent = message || '';
+  scanErrorBox.hidden = !message;
+}
 
 // Load antipatterns list and disabled rules
 async function initSettings() {
@@ -164,6 +180,27 @@ async function toggleRule(ruleId, enabled) {
 
 // Listen for messages from the service worker (called by getPort() on each new connection)
 function handlePortMessage(msg) {
+  if (msg.action === 'state') {
+    scannedAt = msg.scannedAt || null;
+    scanning = Boolean(msg.scanning);
+    showScanError(scanning ? null : msg.scanError);
+  }
+  if (msg.action === 'findings') {
+    scannedAt = Date.now();
+    scanning = false;
+    showScanError(null);
+  }
+  if (msg.action === 'scanning') {
+    scanning = true;
+    showScanError(null);
+    if (!currentFindings.length) showScanning();
+  }
+  if (msg.action === 'scan-failed') {
+    scanning = false;
+    showScanError(msg.message || 'Couldn\u2019t scan this page.');
+    if (!currentFindings.length) renderFindings([]);
+    return;
+  }
   if (msg.action === 'page-pointer-active') {
     // Cursor is active on the page → user has left the panel
     setHoveredItem(null);
@@ -181,7 +218,12 @@ function handlePortMessage(msg) {
     updateToggleButton();
   }
   if (msg.action === 'navigated') {
-    showScanning();
+    scannedAt = null;
+    scanning = Boolean(msg.rescanning);
+    showScanError(null);
+    currentFindings = [];
+    badge.classList.remove('visible');
+    renderFindings([]);
   }
 }
 
@@ -193,10 +235,15 @@ getPort();
 setInterval(() => postToPort({ action: 'ping' }), 20000);
 
 // Controls
-btnRescan.addEventListener('click', () => {
+function requestScan() {
+  scanning = true;
+  showScanError(null);
   showScanning();
   postToPort({ action: 'scan' });
-});
+}
+btnRescan.addEventListener('click', requestScan);
+btnScanNow.addEventListener('click', requestScan);
+btnRetry.addEventListener('click', requestScan);
 
 btnToggle.addEventListener('click', () => {
   postToPort({ action: 'toggle-overlays' });
@@ -215,7 +262,7 @@ function updateToggleButton() {
 
 function showScanning() {
   container.innerHTML = `
-    <div class="scanning-indicator">
+    <div class="scanning-indicator" role="status">
       <div class="scanning-dot"></div>
       Scanning page...
     </div>`;
@@ -431,14 +478,38 @@ container.addEventListener('pointerleave', () => setHoveredItem(null));
 window.addEventListener('blur', () => setHoveredItem(null));
 
 
+// Two empty states that must read differently: a tab nobody has scanned, and a
+// scan that finished with nothing to report.
+function renderEmptyState() {
+  if (!scannedAt) {
+    emptyTitle.textContent = 'Not scanned yet';
+    emptyHint.textContent = 'Scan this page to check it against the rules.';
+    // The failure banner carries its own retry; one scan action is enough.
+    btnScanNow.hidden = !scanErrorBox.hidden;
+    return;
+  }
+  const active = allAntipatterns.length ? allAntipatterns.length - disabledRules.length : 0;
+  const time = new Date(scannedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  emptyTitle.textContent = 'Clean.';
+  emptyHint.textContent = active > 0
+    ? `Nothing found by ${active} rules at ${time}.`
+    : `Nothing found at ${time}.`;
+  btnScanNow.hidden = true;
+}
+
 function renderFindings(findings) {
   currentFindings = findings;
   if (!findings.length) {
+    badge.classList.remove('visible');
+    badge.textContent = '0';
+    if (scanning) {
+      showScanning();
+      return;
+    }
     container.innerHTML = '';
     container.appendChild(emptyState);
     emptyState.style.display = '';
-    badge.classList.remove('visible');
-    badge.textContent = '0';
+    renderEmptyState();
     return;
   }
 

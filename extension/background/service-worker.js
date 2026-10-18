@@ -9,7 +9,9 @@
  * popup nor the DevTools panel see any of that; their messages are unchanged.
  */
 
-// Per-tab state: { tabId: { findings, overlaysVisible, injected } }
+// Per-tab state: { tabId: { findings, overlaysVisible, injected, scannedAt,
+// scanning, scanError } }. scannedAt is null until a scan has finished, so a UI
+// can tell "never scanned" from "scanned and clean".
 const tabState = new Map();
 
 // Active DevTools panel connections: { tabId: Set<port> }
@@ -19,7 +21,10 @@ const OFFSCREEN_URL = 'offscreen/offscreen.html';
 
 function getState(tabId) {
   if (!tabState.has(tabId)) {
-    tabState.set(tabId, { findings: [], overlaysVisible: true, injected: false, csInjected: false });
+    tabState.set(tabId, {
+      findings: [], overlaysVisible: true, injected: false, csInjected: false,
+      scannedAt: null, scanning: false, scanError: null,
+    });
   }
   return tabState.get(tabId);
 }
@@ -154,19 +159,51 @@ async function ensureContentScriptInjected(tabId) {
   }
 }
 
+// A scan that has not reported back in this long is treated as failed, so no
+// surface sits on "Scanning page..." forever.
+const SCAN_TIMEOUT_MS = 30000;
+
+// Pages the browser never lets an extension script into.
+function isRestrictedUrl(url) {
+  return /^(chrome|chrome-extension|edge|about|devtools|view-source|moz-extension):/.test(url)
+    || /^https:\/\/chromewebstore\.google\.com\//.test(url)
+    || /^https:\/\/chrome\.google\.com\/webstore/.test(url)
+    || /^https:\/\/microsoftedge\.microsoft\.com\/addons/.test(url);
+}
+
 function reportScanFailure(tabId, message) {
+  const state = getState(tabId);
+  clearTimeout(state.scanTimer);
+  state.scanning = false;
+  state.scanError = message;
   chrome.runtime.sendMessage({ action: 'scan-failed', tabId, message }).catch(() => {});
   notifyPanels(tabId, { action: 'scan-failed', message });
 }
 
 async function sendScanToTab(tabId) {
+  const state = getState(tabId);
+  state.scanning = true;
+  state.scanError = null;
+  notifyPanels(tabId, { action: 'scanning' });
+  clearTimeout(state.scanTimer);
+  state.scanTimer = setTimeout(() => {
+    if (state.scanning) {
+      reportScanFailure(tabId, 'The scan did not finish. Reload the page and scan again.');
+    }
+  }, SCAN_TIMEOUT_MS);
+
+  let url = '';
+  try { url = (await chrome.tabs.get(tabId))?.url || ''; } catch { /* tab gone */ }
+  if (isRestrictedUrl(url)) {
+    reportScanFailure(tabId, 'Browser pages and extension stores block extensions, so this page can\u2019t be scanned. Open a regular web page.');
+    return;
+  }
+
   const { ok, error } = await ensureContentScriptInjected(tabId);
   if (!ok) {
     // Injection was blocked. Tell an open popup why so it can stop showing
     // "Scanning..." and surface a hint. The popup may be closed, so ignore
     // delivery failures.
-    let url = '';
-    try { url = (await chrome.tabs.get(tabId))?.url || ''; } catch { /* tab gone */ }
     const message = url.startsWith('file:')
       ? 'Can’t scan local files. Enable “Allow access to file URLs” for Impeccable in chrome://extensions.'
       : `Couldn’t scan this page${error ? `: ${error}` : '.'}`;
@@ -195,6 +232,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     const state = getState(tabId);
     state.findings = msg.findings || [];
     state.injected = true;
+    state.scannedAt = Date.now();
+    clearTimeout(state.scanTimer);
+    state.scanning = false;
+    state.scanError = null;
     if (msg.stats) state.stats = msg.stats;
     updateBadge(tabId);
     notifyPanels(tabId, { action: 'findings', findings: state.findings });
@@ -297,8 +338,10 @@ chrome.runtime.onConnect.addListener((port) => {
     const state = getState(tabId);
     port.postMessage({ action: 'state', ...state });
 
-    // If no findings yet, the auto-scan from devtools.js may have been lost -- trigger one
-    if (!state.findings.length) {
+    // If this tab has not been scanned, the auto-scan from devtools.js may have
+    // been lost -- trigger one. A clean, finished scan must not rescan on every
+    // reconnect, and a scan already in flight must not be doubled.
+    if (!state.scannedAt && !state.scanning) {
       sendScanToTab(tabId);
     }
 
@@ -330,7 +373,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
     const state = getState(tabId);
     port.postMessage({ action: 'state', ...state });
-    if (!state.findings.length) sendScanToTab(tabId);
+    if (!state.scannedAt && !state.scanning) sendScanToTab(tabId);
 
     port.onDisconnect.addListener(() => {
       panelPorts.get(tabId)?.delete(port);
@@ -356,12 +399,16 @@ chrome.webNavigation?.onCompleted?.addListener((details) => {
   state.findings = [];
   state.injected = false;
   state.csInjected = false;
-  updateBadge(details.tabId);
-  notifyPanels(details.tabId, { action: 'navigated' });
-
   // Auto-rescan only when DevTools is the driver — the popup is user-triggered and
   // shouldn't fire scans the user didn't ask for.
-  if (devtoolsTabs.has(details.tabId) && wasActive) {
+  const willRescan = devtoolsTabs.has(details.tabId) && wasActive;
+  state.scannedAt = null;
+  state.scanning = willRescan;
+  state.scanError = null;
+  updateBadge(details.tabId);
+  notifyPanels(details.tabId, { action: 'navigated', rescanning: willRescan });
+
+  if (willRescan) {
     setTimeout(() => sendScanToTab(details.tabId), 300);
   }
 });

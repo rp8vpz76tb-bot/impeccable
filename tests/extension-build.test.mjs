@@ -48,7 +48,13 @@ function scannerHarness({ firefox = false, existingHost = false, failFirstCreate
     body: { appendChild(frame) { create(); frames.push(frame); } },
   } : undefined;
   if (!firefox) chrome.offscreen = { async createDocument() { create(); } };
-  const context = vm.createContext({ chrome, document, setTimeout });
+  // The scan watchdog (30s) must not keep the test process alive.
+  const timers = (fn, ms, ...args) => {
+    const timer = setTimeout(fn, ms, ...args);
+    if (ms >= 30000) timer.unref();
+    return timer;
+  };
+  const context = vm.createContext({ chrome, document, setTimeout: timers, clearTimeout });
   vm.runInContext(readFileSync(path.join(ROOT, 'extension/background/service-worker.js'), 'utf8'), context);
   return { context, frames, runtimeMessages, tabMessages, creates: () => creates };
 }
@@ -198,3 +204,51 @@ describe('extension badge colors', () => {
     assert.doesNotMatch(source, /#d6336c/, 'the magenta badge is retired');
   });
 });
+
+describe('extension scan state', () => {
+  const state = (h, tabId = 7) => vm.runInContext(`getState(${tabId})`, h.context);
+
+  it('starts a tab as never scanned, not as clean', () => {
+    const h = scannerHarness();
+    const s = state(h);
+    assert.equal(s.scannedAt, null);
+    assert.equal(s.scanning, false);
+    assert.equal(s.scanError, null);
+  });
+
+  it('marks a scan in flight until findings arrive', async () => {
+    const h = scannerHarness();
+    await vm.runInContext('sendScanToTab(7)', h.context);
+    assert.equal(state(h).scanning, true);
+    assert.equal(state(h).scannedAt, null);
+  });
+
+  it('records a failure and stops scanning', async () => {
+    const h = scannerHarness({ failFirstCreate: true });
+    await vm.runInContext('sendScanToTab(7)', h.context);
+    assert.equal(state(h).scanning, false);
+    assert.match(state(h).scanError, /host creation failed/);
+  });
+
+  it('refuses browser and store pages up front with a plain message', async () => {
+    const h = scannerHarness();
+    h.context.chrome.tabs.get = async () => ({ url: 'chrome://extensions' });
+    await vm.runInContext('sendScanToTab(7)', h.context);
+    assert.equal(h.tabMessages.length, 0);
+    assert.equal(h.creates(), 0);
+    assert.match(state(h).scanError, /can.t be scanned/);
+    assert.equal(state(h).scanning, false);
+  });
+
+  it('fails a scan that never reports back', async () => {
+    const h = scannerHarness();
+    h.context.setTimeout = (fn) => { h.fire = fn; return 1; };
+    await vm.runInContext('sendScanToTab(7)', h.context);
+    assert.equal(state(h).scanning, true);
+    h.fire();
+    assert.equal(state(h).scanning, false);
+    assert.match(state(h).scanError, /did not finish/);
+    assert.equal(h.runtimeMessages.filter(m => m.action === 'scan-failed').length, 1);
+  });
+});
+

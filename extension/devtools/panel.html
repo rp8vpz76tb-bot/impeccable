@@ -59,11 +59,17 @@
     <div id="settings-list"></div>
   </div>
 
+  <div class="scan-error" id="scan-error" role="alert" hidden>
+    <span id="scan-error-text"></span>
+    <button type="button" class="scan-error-retry" id="btn-retry">Scan again</button>
+  </div>
+
   <main id="findings-container">
     <div class="empty-state" id="empty-state">
       <div class="empty-icon">/</div>
-      <p class="empty-title">No anti-patterns detected</p>
-      <p class="empty-hint">Overlays will appear on the page when issues are found</p>
+      <p class="empty-title" id="empty-title">Not scanned yet</p>
+      <p class="empty-hint" id="empty-hint">Scan this page to check it against the rules.</p>
+      <button type="button" class="state-action" id="btn-scan-now">Scan page</button>
     </div>
   </main>
 

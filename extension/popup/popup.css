@@ -62,6 +62,13 @@ h1 {
   border-bottom-color: var(--ks-kinpaku);
 }
 
+/* A finished scan with nothing found: ink numeral, patina rule. Never the faint
+   numeral, which belongs to a tab that has not been scanned. */
+.count-number.is-clean {
+  color: var(--ks-ink);
+  border-bottom-color: var(--ks-patina-deep);
+}
+
 .count-label {
   display: block;
   margin-top: 8px;

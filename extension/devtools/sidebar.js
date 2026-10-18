@@ -11,6 +11,7 @@ if (chrome.devtools.panels.themeName === 'dark') {
 const tabId = chrome.devtools.inspectedWindow.tabId;
 const content = document.getElementById('sidebar-content');
 let currentFindings = [];
+let scanned = false;
 
 // Auto-reconnecting port (service worker may restart in MV3)
 let port = null;
@@ -18,8 +19,14 @@ function getPort() {
   if (port) return port;
   port = chrome.runtime.connect({ name: `impeccable-sidebar-${tabId}` });
   port.onMessage.addListener((msg) => {
+    if (msg.action === 'navigated') {
+      currentFindings = [];
+      scanned = false;
+      refreshForCurrentSelection();
+    }
     if (msg.action === 'findings' || msg.action === 'state') {
       currentFindings = msg.findings || [];
+      scanned = msg.action === 'findings' || Boolean(msg.scannedAt);
       refreshForCurrentSelection();
     }
   });
@@ -32,7 +39,8 @@ chrome.devtools.panels.elements.onSelectionChanged.addListener(refreshForCurrent
 
 function refreshForCurrentSelection() {
   if (!currentFindings.length) {
-    renderEmpty('No findings on this page yet.');
+    if (scanned) renderNoFindings('No anti-patterns on this page.');
+    else renderEmpty('Not scanned yet. Open the Impeccable panel to scan this page.');
     return;
   }
 
@@ -70,8 +78,8 @@ function renderEmpty(text) {
   content.innerHTML = `<div class="state">${escapeHtml(text)}</div>`;
 }
 
-function renderNoFindings() {
-  content.innerHTML = `<div class="state"><strong>Clean.</strong> No anti-patterns on this element.</div>`;
+function renderNoFindings(text = 'No anti-patterns on this element.') {
+  content.innerHTML = `<div class="state"><strong>Clean.</strong> ${escapeHtml(text)}</div>`;
 }
 
 function render(items) {

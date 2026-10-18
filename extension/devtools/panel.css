@@ -425,6 +425,45 @@ h1 {
   color: var(--ks-text-muted);
 }
 
+/* A scan that did not run. Vermilion, as in the popup. */
+.scan-error {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 8px 12px 0;
+  padding-left: 8px;
+  border-left: 2px solid var(--ks-vermilion);
+  font-size: var(--ks-type-label);
+  line-height: 1.45;
+  color: var(--ks-vermilion);
+}
+
+.scan-error[hidden] {
+  display: none;
+}
+
+.scan-error-retry,
+.state-action {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid var(--ks-edge);
+  border-radius: var(--ks-radius-sm);
+  background: var(--ks-paper-raised);
+  box-shadow: var(--ks-cap-lift);
+  font: inherit;
+  font-size: var(--ks-type-label);
+  color: var(--ks-ink);
+  cursor: pointer;
+}
+
+.state-action {
+  margin-top: 12px;
+}
+
+.state-action[hidden] {
+  display: none;
+}
+
 /* ============================================================
    Settings. Every control here is paper hardware.
    ============================================================ */
